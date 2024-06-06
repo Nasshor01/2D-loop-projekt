@@ -14,7 +14,7 @@ var area_size = 50  # Velikost oblasti 50x50 metrů
 
 func _ready():
     print("Starting to generate path")
-    var success = generate_closed_loop(Vector3(rand_range(-area_size / 2, area_size / 2), 0, rand_range(-area_size / 2, area_size / 2)))
+    var success = generate_closed_loop(Vector3(0, 0, 0))
     if success:
         create_path_tiles()
     else:
@@ -81,7 +81,7 @@ func count_neighbors(pos: Vector3) -> int:
     return count
 
 func is_path_closed(start: Vector3) -> bool:
-    return path_points.size() > 1 and path_points[path_points.size() - 1].distance_to(start) <= tile_size.length()
+    return path_points.size() > 1 and path_points[path_points.size() - 1].distance_to(start) <= tile_size.length() and count_neighbors(start) == 2
 
 func create_path_tiles():
     if path_points.size() == 0:
