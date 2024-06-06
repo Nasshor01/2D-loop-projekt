@@ -69,6 +69,9 @@ func is_valid_position(position: Vector3) -> bool:
     return not grid.has(vec_to_key(position)) and within_bounds(position)
 
 func is_valid_turn(current_position: Vector3, next_position: Vector3) -> bool:
+    if path_points.size() < 2:
+        return true  # First move is always valid
+
     var last_direction = (current_position - path_points[path_points.size() - 2]).normalized()
     var new_direction = (next_position - current_position).normalized()
     return last_direction != -new_direction  # Check if the turn is not 180 degrees
