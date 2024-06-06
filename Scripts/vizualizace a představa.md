@@ -7,3 +7,8 @@ Hnědá - startovní pozice která je náhodná
 Červená - Šipky ukazující směr kudy se generuje mapa 
 Zelená - volné pole který obsahuje každý blok a má tyto pole 2
 Růžová - propojení a vizualizace jaký blok ma jaký volné pole (volné pole muže být společné s ostatnímy bloky)
+
+
+![image](https://github.com/Nasshor01/3D-loop-hero/assets/141824772/ebf25f61-80f8-47cb-a313-006efb7fdb2e)
+
+vysvětlení to co to nesmí udělat
