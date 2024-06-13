@@ -1,132 +1,158 @@
-extends Node3D
+extends Node2D
 
-@export var tile_scene: PackedScene
-var path_points = []
-var tile_size = Vector3(4, 0, 4)  # Velikost dlaždice
-var grid = {}
-var directions = [
-    Vector3(tile_size.x, 0, 0),  # Right
-    Vector3(-tile_size.x, 0, 0),  # Left
-    Vector3(0, 0, tile_size.z),  # Forward
-    Vector3(0, 0, -tile_size.z)  # Backward
-]
-var area_size = 50  # Velikost oblasti 50x50 metrů
-var max_attempts = 1000  # Maximální počet pokusů
+# Velikost gridu (Grid size)
+var grid_width = 20
+var grid_height = 20
+
+# ID dlaždic (Tile IDs)
+const PATH_TILE_ID = 0
+const CAMPFIRE_TILE_ID = 1
+
+@onready var path_tilemap = $PathTileMap
+@onready var campfire_tilemap = $PathTileMap
 
 func _ready():
-    print("Starting to generate path")
-    var success = generate_closed_loop(Vector3(rand_range(-area_size / 2, area_size / 2), 0, rand_range(-area_size / 2, area_size / 2)))
-    if success:
-        create_path_tiles()
-    else:
-        print("Failed to generate a path")
+	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
+	print("Starting generation...")
+	randomize()
+	await generate_loop_path()
+	print("Generation completed.")
 
-func generate_closed_loop(start: Vector3) -> bool:
-    print("Generating closed loop")
-    path_points.clear()
-    grid.clear()
-    path_points.append(start)
-    grid[vec_to_key(start)] = true
+func generate_loop_path() -> void:
+	# Generuje smyčku cesty v gridu (Generates loop path in the grid)
+	if path_tilemap == null:
+		print("PathTileMap not found.")
+		return
+	if campfire_tilemap == null:
+		print("CampfireTileMap not found.")
+		return
 
-    var current_position = start
-    var steps = 0
-    while steps < max_attempts:  # Limit to prevent infinite loops
-        var next_position = get_next_position(current_position)
-        var attempts = 0
-        while (not is_valid_position(next_position) or not is_valid_turn(current_position, next_position) or not has_free_neighbors(current_position, next_position)) and attempts < 100:
-            next_position = get_next_position(current_position)
-            attempts += 1
+	print("TileMap nodes found.")
+	
+	# Inicializace gridu (Initialize grid)
+	var map_grid = []
+	for i in range(grid_width):
+		map_grid.append([])
+		for j in range(grid_height):
+			map_grid[i].append(0)
 
-        if attempts >= 100:
-            print("Failed to find a valid next position after 100 attempts at step", steps)
-            return false
+	print("Grid initialized.")
 
-        path_points.append(next_position)
-        grid[vec_to_key(next_position)] = true
-        current_position = next_position
-        steps += 1
-        print("Step", steps, ": Moved to", next_position)
+	# Startovací pozice (více uprostřed) (Starting position, more centered)
+	var start_x = randi() % 5 + 8
+	var start_y = randi() % 5 + 8
+	var x = start_x
+	var y = start_y
+	map_grid[x][y] = 1
+	campfire_tilemap.set_cell(0, Vector2i(x, y), CAMPFIRE_TILE_ID, Vector2i(0, 0), 0)
 
-        if count_neighbors(start) == 2 and current_position.distance_to(start) <= tile_size.length():
-            print("Closed loop generated successfully after", steps, "steps")
-            return true
+	print("Starting position: ", x, y)
 
-    return false
+	# Generování smyčky cesty (Generate the loop path)
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]  # Vlevo, vpravo, nahoru, dolů (Left, right, up, down)
+	var path_stack = [Vector2(x, y)]
+	var loop_created = false
+	var max_path_length = 50
+	var next_x = x
+	var next_y = y
 
-func get_next_position(current_position: Vector3) -> Vector3:
-    var valid_directions = []
-    for direction in directions:
-        var next_position = current_position + direction
-        if is_valid_position(next_position) and count_neighbors(next_position) == 0:
-            valid_directions.append(direction)
-    
-    if valid_directions.size() == 0:
-        return current_position + directions[randi() % directions.size()]
+	while not loop_created and path_stack.size() > 0:
+		var current = path_stack[path_stack.size() - 1]
+		x = int(current.x)
+		y = int(current.y)
 
-    return current_position + valid_directions[randi() % valid_directions.size()]
+		var valid_directions = get_valid_directions(map_grid, x, y)
 
-func is_valid_position(position: Vector3) -> bool:
-    return not grid.has(vec_to_key(position)) and within_bounds(position)
+		if valid_directions.size() == 0:
+			path_stack.pop_back()
+			continue
 
-func is_valid_turn(current_position: Vector3, next_position: Vector3) -> bool:
-    if path_points.size() < 2:
-        return true  # First move is always valid
+		valid_directions.shuffle() # Zamíchat pro náhodnost (Shuffle to add randomness)
+		for direction in valid_directions:
+			next_x = x + int(direction.x) * 2
+			next_y = y + int(direction.y) * 2
 
-    var last_direction = (current_position - path_points[path_points.size() - 2]).normalized()
-    var new_direction = (next_position - current_position).normalized()
-    return last_direction != -new_direction  # Check if the turn is not 180 degrees
+			if is_within_bounds(next_x, next_y) and map_grid[next_x][next_y] == 0 and map_grid[x + int(direction.x)][y + int(direction.y)] == 0:
+				if not will_block_loop(map_grid, next_x, next_y):
+					map_grid[next_x][next_y] = 1
+					map_grid[x + int(direction.x)][y + int(direction.y)] = 1
+					path_tilemap.set_cell(0, Vector2i(next_x, next_y), PATH_TILE_ID, Vector2i(0, 1), 0)
+					path_tilemap.set_cell(0, Vector2i(x + int(direction.x), y + int(direction.y)), PATH_TILE_ID, Vector2i(0, 1), 0)
+					path_stack.append(Vector2(next_x, next_y))
+					await get_tree().create_timer(0.1).timeout
 
-func has_free_neighbors(current_position: Vector3, next_position: Vector3) -> bool:
-    var free_neighbors = 0
-    for direction in directions:
-        var neighbor = next_position + direction
-        if not grid.has(vec_to_key(neighbor)) and neighbor != current_position:
-            free_neighbors += 1
-    return free_neighbors == 2
+					# Zkontrolovat uzavřenou smyčku nebo pokud je délka cesty větší než max_path_length (Check for closed loop or if path length is greater than max_path_length)
+					if (abs(next_x - start_x) <= 2 and abs(next_y - start_y) <= 2 and path_stack.size() > 10) or path_stack.size() > max_path_length:
+						# Pokusit se připojit zpět k táboráku (Try to connect back to campfire)
+						loop_created = connect_to_campfire(map_grid, path_tilemap, next_x, next_y, start_x, start_y)
+						if loop_created:
+							break
+					break
 
-func within_bounds(position: Vector3) -> bool:
-    return abs(position.x) <= area_size / 2 and abs(position.z) <= area_size / 2
+	print("Path rendering completed.")
+	# Zajistit, že nezůstanou žádné slepé cesty (Ensure no dead ends remain)
+	remove_dead_ends(map_grid)
+	return
 
-func vec_to_key(vec: Vector3) -> String:
-    return str(vec.x) + "_" + str(vec.y) + "_" + str(vec.z)
+func get_valid_directions(grid, x, y):
+	# Získá platné směry pro rozšíření cesty (Gets valid directions for extending the path)
+	var directions = []
+	if is_within_bounds(x - 2, y) and grid[x - 2][y] == 0 and grid[x - 1][y] == 0:
+		directions.append(Vector2(-1, 0))  # Vlevo (Left)
+	if is_within_bounds(x + 2, y) and grid[x + 2][y] == 0 and grid[x + 1][y] == 0:
+		directions.append(Vector2(1, 0))  # Vpravo (Right)
+	if is_within_bounds(x, y - 2) and grid[x][y - 2] == 0 and grid[x][y - 1] == 0:
+		directions.append(Vector2(0, -1))  # Nahoru (Up)
+	if is_within_bounds(x, y + 2) and grid[x][y + 2] == 0 and grid[x][y + 1] == 0:
+		directions.append(Vector2(0, 1))  # Dolů (Down)
+	return directions
 
-func count_neighbors(pos: Vector3) -> int:
-    var count = 0
-    for direction in directions:
-        if grid.has(vec_to_key(pos + direction)):
-            count += 1
-    return count
+func is_within_bounds(x, y):
+	# Kontroluje, zda jsou souřadnice uvnitř hranic gridu (Checks if the coordinates are within the grid boundaries)
+	return x > 0 and x < grid_width - 1 and y > 0 and y < grid_height - 1
 
-func create_path_tiles():
-    if path_points.size() == 0:
-        print("No path points to create tiles")
-        return
+func connect_to_campfire(grid, tilemap, x, y, start_x, start_y):
+	# Pokouší se připojit cestu zpět k táboráku (Attempts to connect the path back to the campfire)
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+	for direction in directions:
+		var next_x = x + int(direction.x)
+		var next_y = y + int(direction.y)
+		if is_within_bounds(next_x, next_y) and abs(next_x - start_x) <= 1 and abs(next_y - start_y) <= 1:
+			grid[next_x][next_y] = 1
+			tilemap.set_cell(0, Vector2i(next_x, next_y), PATH_TILE_ID, Vector2i(0, 1), 0)
+			return true
+	return false
 
-    for i in range(path_points.size() - 1):
-        var start_point = path_points[i]
-        var end_point = path_points[i + 1]
-        print("Creating path segment from ", start_point, " to ", end_point)
-        create_path_segment(start_point, end_point)
+func will_block_loop(grid, x, y):
+	# Kontroluje, zda přidání cesty zablokuje smyčku (Checks if adding a path will block the loop)
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+	var count = 0
+	for direction in directions:
+		var nx = x + int(direction.x)
+		var ny = y + int(direction.y)
+		if is_within_bounds(nx, ny) and grid[nx][ny] == 1:
+			count += 1
+	return count >= 2
 
-func create_path_segment(start: Vector3, end: Vector3):
-    var direction = (end - start).normalized() * tile_size.length()
-    var current_position = start
+func remove_dead_ends(grid):
+	# Odstraňuje slepé cesty z gridu (Removes dead ends from the grid)
+	var changes_made = true
+	while changes_made:
+		changes_made = false
+		for x in range(grid_width):
+			for y in range(grid_height):
+				if grid[x][y] == 1 and count_adjacent_paths(grid, x, y) == 1:
+					grid[x][y] = 0
+					path_tilemap.set_cell(0, Vector2i(x, y), -1)
+					changes_made = true
 
-    while current_position.distance_to(start) < start.distance_to(end):
-        var tile_instance = tile_scene.instantiate()
-        if tile_instance == null:
-            print("Failed to instantiate tile_scene")
-            return
-        tile_instance.transform.origin = current_position
-        tile_instance.transform.origin.y = 0  # Udržet dlaždice na zemi
-        add_child(tile_instance)
-        current_position += direction
-
-    # Add the last tile to ensure full coverage
-    var last_tile_instance = tile_scene.instantiate()
-    if last_tile_instance == null:
-        print("Failed to instantiate last tile")
-        return
-    last_tile_instance.transform.origin = end
-    last_tile_instance.transform.origin.y = 0  # Udržet dlaždice na zemi
-    add_child(last_tile_instance)
+func count_adjacent_paths(grid, x, y):
+	# Počítá sousední cesty (Counts adjacent paths)
+	var count = 0
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+	for direction in directions:
+		var nx = x + int(direction.x)
+		var ny = y + int(direction.y)
+		if is_within_bounds(nx, ny) and grid[nx][ny] == 1:
+			count += 1
+	return count
