@@ -44,7 +44,7 @@ func generate_loop_path() -> void:
 	var x = start_x
 	var y = start_y
 	map_grid[x][y] = 1
-	campfire_tilemap.set_cell(0, Vector2i(x, y), CAMPFIRE_TILE_ID, Vector2i(0, 0), 0)
+	campfire_tilemap.set_cell(0, Vector2i(x, y), CAMPFIRE_TILE_ID, Vector2i(0, 0), 0) # pozice Atlas souřadnic ID1
 
 	print("Starting position: ", x, y)
 
