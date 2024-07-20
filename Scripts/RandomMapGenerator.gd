@@ -11,12 +11,23 @@ const CAMPFIRE_TILE_ID = 1
 @onready var path_tilemap = $PathTileMap
 @onready var campfire_tilemap = $PathTileMap
 
+# Cesta ke scéně hráče
+@export var PlayerScene: PackedScene
+
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
 	print("Starting generation...")
 	randomize()
 	await generate_loop_path()
 	print("Generation completed.")
+	
+	# Přidání časovače pro spawn hráče po 2 sekundách (Add timer to spawn player after 2 seconds)
+	var timer = Timer.new()
+	timer.wait_time = 2.0
+	timer.one_shot = true
+	timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
+	add_child(timer)
+	timer.start()
 
 func generate_loop_path() -> void:
 	# Generuje smyčku cesty v gridu (Generates loop path in the grid)
@@ -49,7 +60,6 @@ func generate_loop_path() -> void:
 	print("Starting position: ", x, y)
 
 	# Generování smyčky cesty (Generate the loop path)
-	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]  # Vlevo, vpravo, nahoru, dolů (Left, right, up, down)
 	var path_stack = [Vector2(x, y)]
 	var loop_created = false
 	var max_path_length = 50
@@ -156,3 +166,25 @@ func count_adjacent_paths(grid, x, y):
 		if is_within_bounds(nx, ny) and grid[nx][ny] == 1:
 			count += 1
 	return count
+
+func find_campfire_and_spawn_player():
+	print("Starting find_campfire_and_spawn_player")
+	
+	# Get all positions of tiles with the campfire ID (CAMPFIRE_TILE_ID) in layer 0
+	var campfire_positions = campfire_tilemap.get_used_cells_by_id(0, CAMPFIRE_TILE_ID)
+	print("Found campfire positions: ", campfire_positions)
+	
+	# If at least one position is found, use the first one
+	if campfire_positions.size() > 0:
+		# Convert the coordinates to world coordinates
+		var campfire_position = campfire_tilemap.map_to_local(campfire_positions[0])
+		print("Campfire position found at: ", campfire_position)
+		
+		# Create an instance of the player and set its position to the campfire position
+		var player_instance = PlayerScene.instantiate()
+		player_instance.position = campfire_position
+		add_child(player_instance)
+		
+		print("Player spawned at campfire position: ", campfire_position)
+	else:
+		print("Campfire tile not found.")
