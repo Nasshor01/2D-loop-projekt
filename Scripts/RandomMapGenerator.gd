@@ -19,6 +19,13 @@ var path = []
 var path_index = 0
 var player_instance = null
 
+# Pravděpodobnost teleportace (Probability of teleportation)
+@export var TELEPORT_PROBABILITY = 0.1
+@export var CHANGE_DIRECTION_PROBABILITY = 0.5
+
+# Směr pohybu (Direction of movement)
+var direction = 1
+
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
 	print("Starting generation...")
@@ -229,7 +236,23 @@ func move_along_path():
 	if player_instance == null or path.size() == 0:
 		return
 	
-	# Posun hráče na další pozici v cestě (Move player to the next position in the path)
-	path_index = (path_index + 1) % path.size()
+	# Náhodná šance na teleportaci (Random chance for teleportation)
+	if randi() % 100 < TELEPORT_PROBABILITY * 100:
+		teleport_player()
+	else:
+		# Posun hráče na další pozici v cestě (Move player to the next position in the path)
+		path_index = (path_index + direction) % path.size()
+		if path_index < 0:
+			path_index = path.size() - 1
+		var next_position = path_tilemap.map_to_local(path[path_index])
+		player_instance.position = next_position
+
+func teleport_player():
+	# Teleport hráče na náhodnou pozici na cestě (Teleport player to a random position on the path)
+	path_index = randi() % path.size()
 	var next_position = path_tilemap.map_to_local(path[path_index])
 	player_instance.position = next_position
+	
+	# Náhodná šance na změnu směru (Random chance to change direction)
+	if randi() % 100 < CHANGE_DIRECTION_PROBABILITY * 100:
+		direction *= -1
