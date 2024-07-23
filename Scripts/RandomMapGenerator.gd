@@ -14,6 +14,11 @@ const CAMPFIRE_TILE_ID = 1
 # Cesta ke scéně hráče
 @export var PlayerScene: PackedScene
 
+# Cesta, kterou postava sleduje (Path the character follows)
+var path = []
+var path_index = 0
+var player_instance = null
+
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
 	print("Starting generation...")
@@ -102,6 +107,9 @@ func generate_loop_path() -> void:
 	print("Path rendering completed.")
 	# Zajistit, že nezůstanou žádné slepé cesty (Ensure no dead ends remain)
 	remove_dead_ends(map_grid)
+	
+	# Uložení cesty do proměnné `path` (Save path to the `path` variable)
+	path = extract_path_from_grid(map_grid, start_x, start_y)
 	return
 
 func get_valid_directions(grid, x, y):
@@ -181,10 +189,47 @@ func find_campfire_and_spawn_player():
 		print("Campfire position found at: ", campfire_position)
 		
 		# Create an instance of the player and set its position to the campfire position
-		var player_instance = PlayerScene.instantiate()
+		player_instance = PlayerScene.instantiate()
 		player_instance.position = campfire_position
 		add_child(player_instance)
 		
 		print("Player spawned at campfire position: ", campfire_position)
+		
+		# Přidání časovače pro pohyb hráče (Add timer for player movement)
+		var move_timer = Timer.new()
+		move_timer.wait_time = 0.5
+		move_timer.autostart = true
+		move_timer.connect("timeout", Callable(self, "move_along_path"))
+		add_child(move_timer)
 	else:
 		print("Campfire tile not found.")
+
+func extract_path_from_grid(grid, start_x, start_y):
+	# Vytvoří seznam souřadnic cesty začínající od táboráku (Creates a list of path coordinates starting from the campfire)
+	var path_coords = []
+	var current_position = Vector2(start_x, start_y)
+	var directions = [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]
+	var visited = []
+	while true:
+		path_coords.append(current_position)
+		visited.append(current_position)
+		var next_position = null
+		for direction in directions:
+			var nx = current_position.x + direction.x
+			var ny = current_position.y + direction.y
+			if is_within_bounds(nx, ny) and grid[nx][ny] == 1 and not Vector2(nx, ny) in visited:
+				next_position = Vector2(nx, ny)
+				break
+		if next_position == null:
+			break
+		current_position = next_position
+	return path_coords
+
+func move_along_path():
+	if player_instance == null or path.size() == 0:
+		return
+	
+	# Posun hráče na další pozici v cestě (Move player to the next position in the path)
+	path_index = (path_index + 1) % path.size()
+	var next_position = path_tilemap.map_to_local(path[path_index])
+	player_instance.position = next_position
