@@ -1,1 +1,11 @@
+ma náhodně vygenerované mapě se budeš pohybovat pomocí hodu kostek ((rogueLike kostky)- na začátku máš pouze jednu kostku 1-6, kostka se dá upgradovat že třeba 1-100, atd více kostek )
 
+všechno je náhodný na úkor GAMBY virtuální,
+
+postava má i šanci se teleportovat po mapě náhodně někdy, % teleportu rostou každým krokem a resetuje se vždy po teleportaci
+
+na Tile mužou být náhodný good wheels, bad wheels či nepřátelé ze kterých mohou padat itemy či goldy, dále se tu muže nacházet shopkeeper u ktere ho se dají prodávat či nakupovat itemy, 
+
+když umřeš na mapě tak zpět si vezmeš tolik věcí kolik si vytočíš % z kola SMRTI, takže buď si vezmeš všechny itemy či goldy na 100%, když máš pod 10% vezmeš si tolik golud dle % ale jen 1 ITEM který bude náhodně vybraný ( tato možnost se dá též upgradovat na základě dalších mechanik ve hře)
+
+hráč může ovlivnovat prubeh hry, napříkal že nemusí hrát na náhodu ale muže si dát průměr, postavy mohou mít ruzne schopnosti například si mohou vybrat kdy se postava muže teleportnout, či aktivovat větší šanci na vytočení lepších věcí, nebo skipnout špatné točky
