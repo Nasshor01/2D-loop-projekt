@@ -20,11 +20,18 @@ var path_index = 0
 var player_instance = null
 
 # Pravděpodobnost teleportace (Probability of teleportation)
-@export var TELEPORT_PROBABILITY = 0.1
+@export var TELEPORT_PROBABILITY_INCREMENT = 0.0002
 @export var CHANGE_DIRECTION_PROBABILITY = 0.5
+
+# Aktuální pravděpodobnost teleportace (Current probability of teleportation)
+var current_teleport_probability = 0.0
 
 # Směr pohybu (Direction of movement)
 var direction = 1
+
+# Ukazatel pravděpodobnosti teleportace (Probability bar)
+@onready var probability_bar = $ProbabilityBar
+@onready var probability_label = $ProbabilityBar/Label
 
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
@@ -40,6 +47,18 @@ func _ready():
 	timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
 	add_child(timer)
 	timer.start()
+
+	# Ověření, zda jsou uzly správně inicializovány
+	if probability_label == null:
+		print("Label not found")
+	if probability_bar == null:
+		print("ProbabilityBar not found")
+
+func update_probability_bar():
+	# Aktualizace hodnoty ukazatele pravděpodobnosti (Update probability bar value)
+	probability_bar.value = current_teleport_probability
+	if probability_label != null:
+		probability_label.text = str(round(current_teleport_probability * 10000) / 100.0) + "%"
 
 func generate_loop_path() -> void:
 	# Generuje smyčku cesty v gridu (Generates loop path in the grid)
@@ -236,8 +255,14 @@ func move_along_path():
 	if player_instance == null or path.size() == 0:
 		return
 	
+	# Zvýšení pravděpodobnosti teleportace (Increase teleport probability)
+	current_teleport_probability += TELEPORT_PROBABILITY_INCREMENT
+	
+	# Aktualizace ukazatele pravděpodobnosti (Update probability bar)
+	update_probability_bar()
+	
 	# Náhodná šance na teleportaci (Random chance for teleportation)
-	if randi() % 100 < TELEPORT_PROBABILITY * 100:
+	if randi() % 100 < current_teleport_probability * 100:
 		teleport_player()
 	else:
 		# Posun hráče na další pozici v cestě (Move player to the next position in the path)
@@ -256,3 +281,7 @@ func teleport_player():
 	# Náhodná šance na změnu směru (Random chance to change direction)
 	if randi() % 100 < CHANGE_DIRECTION_PROBABILITY * 100:
 		direction *= -1
+	
+	# Reset pravděpodobnosti teleportace (Reset teleport probability)
+	current_teleport_probability = 0.0
+	update_probability_bar()
