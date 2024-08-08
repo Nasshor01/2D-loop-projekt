@@ -46,7 +46,7 @@ func _ready():
 	
 	# Přidání časovače pro spawn hráče po 2 sekundách (Add timer to spawn player after 2 seconds)
 	var timer = Timer.new()
-	timer.wait_time = 2.0
+	timer.wait_time = 1.0
 	timer.one_shot = true
 	timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
 	add_child(timer)
@@ -60,12 +60,6 @@ func _ready():
 
 	# Připojení signálu z tomboly
 	tombola_ui.connect("number_drawn", Callable(self, "_on_tombola_ui_number_drawn"))
-
-func update_probability_bar():
-	# Aktualizace hodnoty ukazatele pravděpodobnosti (Update probability bar value)
-	probability_bar.value = current_teleport_probability
-	if probability_label != null:
-		probability_label.text = str(round(current_teleport_probability * 10000) / 100.0) + "%"
 
 func generate_loop_path() -> void:
 	# Generuje smyčku cesty v gridu (Generates loop path in the grid)
@@ -229,6 +223,8 @@ func find_campfire_and_spawn_player():
 		print("Player spawned at campfire position: ", campfire_position)
 	else:
 		print("Campfire tile not found.")
+	
+	tombola_ui.enable_button() # Enable the button after the player has spawned
 
 func extract_path_from_grid(grid, start_x, start_y):
 	# Vytvoří seznam souřadnic cesty začínající od táboráku (Creates a list of path coordinates starting from the campfire)
@@ -279,23 +275,25 @@ func move_player(steps):
 			path_index = path.size() - 1
 		var next_position = path_tilemap.map_to_local(path[path_index])
 		player_instance.position = next_position
-		
-		# Increase teleport probability
+
+		# Zvýšení pravděpodobnosti teleportace (Increase teleport probability)
 		current_teleport_probability += TELEPORT_PROBABILITY_INCREMENT
 		update_probability_bar()
-		
+
 		# Check if the player is on a campfire tile and increase probability
 		var map_position = path_tilemap.local_to_map(player_instance.position)
 		if path_tilemap.get_cell_source_id(0, map_position) == CAMPFIRE_TILE_ID:
 			current_teleport_probability += CAMPFIRE_PROBABILITY_INCREMENT
 			update_probability_bar()
-		
+
 		# Check for teleportation chance
 		if randi() % 100 < current_teleport_probability * 100:
 			teleport_player()
 			break
 
 		await get_tree().create_timer(0.2).timeout
+
+	tombola_ui.enable_button() # Re-enable the button after the movement is completed
 
 func _on_tombola_ui_number_drawn(number):
 	move_player(number)
@@ -313,3 +311,9 @@ func teleport_player():
 	# Reset pravděpodobnosti teleportace (Reset teleport probability)
 	current_teleport_probability = 0.0
 	update_probability_bar()
+
+func update_probability_bar():
+	# Aktualizace hodnoty ukazatele pravděpodobnosti (Update probability bar value)
+	probability_bar.value = current_teleport_probability
+	if probability_label != null:
+		probability_label.text = str(round(current_teleport_probability * 10000) / 100.0) + "%"
