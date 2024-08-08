@@ -21,6 +21,7 @@ var player_instance = null
 
 # Pravděpodobnost teleportace (Probability of teleportation)
 @export var TELEPORT_PROBABILITY_INCREMENT = 0.0002
+@export var CAMPFIRE_PROBABILITY_INCREMENT = 0.02
 @export var CHANGE_DIRECTION_PROBABILITY = 0.5
 
 # Aktuální pravděpodobnost teleportace (Current probability of teleportation)
@@ -32,6 +33,9 @@ var direction = 1
 # Ukazatel pravděpodobnosti teleportace (Probability bar)
 @onready var probability_bar = $ProbabilityBar
 @onready var probability_label = $ProbabilityBar/Label
+
+# Přidání tomboly
+@onready var tombola_ui = $TombolaUI
 
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
@@ -53,6 +57,9 @@ func _ready():
 		print("Label not found")
 	if probability_bar == null:
 		print("ProbabilityBar not found")
+
+	# Připojení signálu z tomboly
+	tombola_ui.connect("number_drawn", Callable(self, "_on_tombola_ui_number_drawn"))
 
 func update_probability_bar():
 	# Aktualizace hodnoty ukazatele pravděpodobnosti (Update probability bar value)
@@ -220,13 +227,6 @@ func find_campfire_and_spawn_player():
 		add_child(player_instance)
 		
 		print("Player spawned at campfire position: ", campfire_position)
-		
-		# Přidání časovače pro pohyb hráče (Add timer for player movement)
-		var move_timer = Timer.new()
-		move_timer.wait_time = 0.5
-		move_timer.autostart = true
-		move_timer.connect("timeout", Callable(self, "move_along_path"))
-		add_child(move_timer)
 	else:
 		print("Campfire tile not found.")
 
@@ -271,6 +271,34 @@ func move_along_path():
 			path_index = path.size() - 1
 		var next_position = path_tilemap.map_to_local(path[path_index])
 		player_instance.position = next_position
+
+func move_player(steps):
+	for i in range(steps):
+		path_index = (path_index + direction) % path.size()
+		if path_index < 0:
+			path_index = path.size() - 1
+		var next_position = path_tilemap.map_to_local(path[path_index])
+		player_instance.position = next_position
+		
+		# Increase teleport probability
+		current_teleport_probability += TELEPORT_PROBABILITY_INCREMENT
+		update_probability_bar()
+		
+		# Check if the player is on a campfire tile and increase probability
+		var map_position = path_tilemap.local_to_map(player_instance.position)
+		if path_tilemap.get_cell_source_id(0, map_position) == CAMPFIRE_TILE_ID:
+			current_teleport_probability += CAMPFIRE_PROBABILITY_INCREMENT
+			update_probability_bar()
+		
+		# Check for teleportation chance
+		if randi() % 100 < current_teleport_probability * 100:
+			teleport_player()
+			break
+
+		await get_tree().create_timer(0.2).timeout
+
+func _on_tombola_ui_number_drawn(number):
+	move_player(number)
 
 func teleport_player():
 	# Teleport hráče na náhodnou pozici na cestě (Teleport player to a random position on the path)
