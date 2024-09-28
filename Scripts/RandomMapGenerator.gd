@@ -14,6 +14,12 @@ const CAMPFIRE_TILE_ID = 1
 # Cesta ke scéně hráče
 @export var PlayerScene: PackedScene
 
+# Cesta ke Slime scéně
+@export var SlimeScene: PackedScene 
+var slime_count = 0
+var max_slimes = 5
+
+
 # Cesta, kterou postava sleduje (Path the character follows)
 var path = []
 var path_index = 0
@@ -39,10 +45,18 @@ var direction = 1
 
 func _ready():
 	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
-	print("Starting generation...")
-	randomize()
-	await generate_loop_path()
-	print("Generation completed.")
+	if Global.player_data.has("position"):
+		print("Obnovuji pozici hráče a mapu...")
+		player_instance = PlayerScene.instantiate()
+		player_instance.position = Global.player_data["position"]
+		add_child(player_instance)
+		path = Global.saved_map_state  # Obnovení stavu mapy
+	else:
+		print("Starting generation...")
+		randomize()
+		await generate_loop_path()
+		print("Generation completed.")
+
 	
 	# Přidání časovače pro spawn hráče po 2 sekundách (Add timer to spawn player after 2 seconds)
 	var timer = Timer.new()
@@ -51,6 +65,14 @@ func _ready():
 	timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
 	add_child(timer)
 	timer.start()
+	
+	# Přidání časovače pro spawn slima
+	var slime_spawn_timer = Timer.new()
+	slime_spawn_timer.wait_time = 5.0  # Spawnuje každých 5 sekund
+	slime_spawn_timer.one_shot = false
+	slime_spawn_timer.connect("timeout", Callable(self, "spawn_slime"))
+	add_child(slime_spawn_timer)
+	slime_spawn_timer.start()
 
 	# Ověření, zda jsou uzly správně inicializovány
 	if probability_label == null:
@@ -135,7 +157,7 @@ func generate_loop_path() -> void:
 	# Zajistit, že nezůstanou žádné slepé cesty (Ensure no dead ends remain)
 	remove_dead_ends(map_grid)
 	
-	# Uložení cesty do proměnné `path` (Save path to the `path` variable)
+	# Uložení cesty do proměnné path (Save path to the path variable)
 	path = extract_path_from_grid(map_grid, start_x, start_y)
 	return
 
@@ -317,3 +339,23 @@ func update_probability_bar():
 	probability_bar.value = current_teleport_probability
 	if probability_label != null:
 		probability_label.text = str(round(current_teleport_probability * 10000) / 100.0) + "%"
+
+func spawn_slime():
+	if slime_count >= max_slimes:
+		print("Max number of slimes reached.")
+		return  # Zabrání dalšímu spawnování
+
+	var spawnable_positions = path_tilemap.get_used_cells_by_id(PATH_TILE_ID)
+	if spawnable_positions.size() > 0:
+		var random_position = spawnable_positions[randi() % spawnable_positions.size()]
+		var world_position = path_tilemap.map_to_local(random_position)
+
+		var slime_instance = SlimeScene.instantiate()
+		slime_instance.position = world_position
+		add_child(slime_instance)
+
+		# Zvýšení počítadla slimeů
+		slime_count += 1
+		print("Slime spawned at: ", world_position)
+	else:
+		print("No available positions to spawn slime.")
