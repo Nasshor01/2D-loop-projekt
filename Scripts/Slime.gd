@@ -6,40 +6,38 @@ extends CharacterBody2D
 @export var attack = 10
 
 var start_position = Vector2()
-const TILE_SIZE = 64  # Nastavte podle velikosti vašich dlaždic
+const TILE_SIZE = 64
 var max_distance = 3 * TILE_SIZE
 var move_speed = 100
 var is_moving = false
 var move_direction = Vector2.ZERO
 
 func _ready():
-	# Přidejte slima do skupiny "Enemy"
 	add_to_group("Enemy")
-	# Připojte signál `body_entered` z uzlu `Area2D`
 	$Area2D.connect("body_entered", Callable(self, "_on_body_entered"))
 
 func _on_body_entered(body):
 	if body.is_in_group("Player"):
-		# Uložte pozici hráče
 		Global.player_data["position"] = body.global_position
-
-		# Uložte cestu (pokud ji máte)
-		Global.saved_map_state = Global.saved_map_state # Zde nastavte stav mapy
-
-		# Uložte data hráče do Global
 		Global.player_data["hp"] = body.hp
 		Global.player_data["max_hp"] = body.max_hp
 		Global.player_data["attack_speed"] = body.attack_speed
 		Global.player_data["attack"] = body.attack
+		
+		Global.enemy_data["hp"] = hp
+		Global.enemy_data["max_hp"] = max_hp
+		Global.enemy_data["attack_speed"] = attack_speed
+		Global.enemy_data["attack"] = attack
+		
+		call_deferred("_start_battle")
 
-		# Uložte data slima do Global
-		Global.enemy_data["hp"] = self.hp
-		Global.enemy_data["max_hp"] = self.max_hp
-		Global.enemy_data["attack_speed"] = self.attack_speed
-		Global.enemy_data["attack"] = self.attack
+func _start_battle():
+	# Načtení battle scény jako poduzlu
+	var battle_scene = load("res://Scenes/battle_scene.tscn").instantiate()
+	get_tree().root.get_node("Main").add_child(battle_scene)
 
-		# Spusťte bitevní scénu
-		get_tree().change_scene_to_file("res://Scenes/battle_scene.tscn")
+	# Odstranění nepřítele ze scény, aby se nezobrazoval během bitvy
+	queue_free()
 
 func _physics_process(delta):
 	if is_moving:
