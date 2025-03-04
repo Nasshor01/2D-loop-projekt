@@ -44,28 +44,35 @@ var direction = 1
 @onready var tombola_ui = $TombolaUI
 
 func _ready():
-	# Inicializuje generátor a spustí generování smyčky (Initializes generator and starts loop generation)
-	if Global.player_data.has("position"):
+	# Zkontrolujte, zda jsou uložena data o pozici hráče a mapě
+	if Global.player_data and Global.player_data.has("position"):
 		print("Obnovuji pozici hráče a mapu...")
+
+		# Vytvořte hráče na uložené pozici
 		player_instance = PlayerScene.instantiate()
 		player_instance.position = Global.player_data["position"]
 		add_child(player_instance)
-		path = Global.saved_map_state  # Obnovení stavu mapy
+
+		# Obnovte uložený stav mapy
+		path = Global.saved_map_state
+		for cell in path:
+			path_tilemap.set_cell(0, cell, PATH_TILE_ID)
+
+		print("Obnovený stav hry.")
 	else:
 		print("Starting generation...")
 		randomize()
 		await generate_loop_path()
 		print("Generation completed.")
 
-	
-	# Přidání časovače pro spawn hráče po 2 sekundách (Add timer to spawn player after 2 seconds)
-	var timer = Timer.new()
-	timer.wait_time = 1.0
-	timer.one_shot = true
-	timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
-	add_child(timer)
-	timer.start()
-	
+		# Přidání časovače pro spawn hráče po 2 sekundách (Add timer to spawn player after 2 seconds)
+		var timer = Timer.new()
+		timer.wait_time = 1.0
+		timer.one_shot = true
+		timer.connect("timeout", Callable(self, "find_campfire_and_spawn_player"))
+		add_child(timer)
+		timer.start()
+
 	# Přidání časovače pro spawn slima
 	var slime_spawn_timer = Timer.new()
 	slime_spawn_timer.wait_time = 5.0  # Spawnuje každých 5 sekund
@@ -82,6 +89,9 @@ func _ready():
 
 	# Připojení signálu z tomboly
 	tombola_ui.connect("number_drawn", Callable(self, "_on_tombola_ui_number_drawn"))
+
+	# Připojení signálu pro ukončení bitvy
+	Global.connect("battle_ended", Callable(self, "_on_battle_ended"))
 
 func generate_loop_path() -> void:
 	# Generuje smyčku cesty v gridu (Generates loop path in the grid)
@@ -359,3 +369,38 @@ func spawn_slime():
 		print("Slime spawned at: ", world_position)
 	else:
 		print("No available positions to spawn slime.")
+
+func _on_battle_ended():
+	print("Bitva ukončena, obnovuji mapu...")
+	
+	# Zavoláme funkci na načtení uloženého stavu mapy
+	load_map()
+	
+	# Zkontrolujeme a obnovíme pozici hráče
+	if not player_instance:
+		print("Hráč nebyl nalezen, vytvářím novou instanci hráče...")
+		player_instance = PlayerScene.instantiate()
+		add_child(player_instance)
+	else:
+		print("Hráč nalezen, obnovuji pozici...")
+	
+	player_instance.position = Global.load_player_position()
+	print("Pozice hráče obnovena na:", player_instance.position)
+
+func load_map():
+	if Global.saved_map_state.empty():
+		print("Chyba: Žádná mapa nebyla uložena! Ujistěte se, že save_map byl volán.")
+		return
+
+	print("Načítám uloženou mapu...")
+	for cell in Global.saved_map_state:
+		print("Načítám buňku:", cell)
+		path_tilemap.set_cell(0, cell, PATH_TILE_ID)
+	print("Mapa byla úspěšně načtena.")
+
+func save_map():
+	var map_state = []
+	for cell in path_tilemap.get_used_cells_by_id(PATH_TILE_ID):
+		map_state.append(cell)
+	Global.save_map_state(map_state)
+	print("Stav mapy uložen:", map_state)
