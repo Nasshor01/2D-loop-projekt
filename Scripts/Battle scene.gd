@@ -14,26 +14,27 @@ var enemy_stats
 @onready var enemy_hp_bar = $EnemyHPBar
 
 func _ready():
-	# Vytvořte nové instance hráče a nepřítele
+	# Initialize the player and enemy from their scenes
 	player = PlayerScene.instantiate()
 	enemy = SlimeScene.instantiate()
-
-	# Přidejte je do scény
+	
+	# Add them to the current battle scene
 	add_child(player)
 	add_child(enemy)
-
-	# Nastavte jejich statistiky z Global dat
+	
+	# Load player stats from Global
 	player.hp = Global.player_data["hp"]
 	player.max_hp = Global.player_data["max_hp"]
 	player.attack_speed = Global.player_data["attack_speed"]
 	player.attack = Global.player_data["attack"]
-
+	
+	# Load enemy stats from Global
 	enemy.hp = Global.enemy_data["hp"]
 	enemy.max_hp = Global.enemy_data["max_hp"]
 	enemy.attack_speed = Global.enemy_data["attack_speed"]
 	enemy.attack = Global.enemy_data["attack"]
-
-	# Inicializujte player_stats a enemy_stats
+	
+	# Initialize player and enemy stats
 	player_stats = {
 		"hp": player.hp,
 		"max_hp": player.max_hp,
@@ -47,23 +48,22 @@ func _ready():
 		"attack_speed": enemy.attack_speed,
 		"attack": enemy.attack
 	}
-
-	# Výpis statistik
+	
 	print("Player Stats:", player_stats)
-	print("Enemy Stats:", enemy_stats)	
-
-	# Nastavte jejich pozice
+	print("Enemy Stats:", enemy_stats)
+	
+	# Set initial positions for the player and enemy
 	player.position = Vector2(100, 200)
 	enemy.position = Vector2(300, 200)
-
-	# Aktualizujte ukazatele zdraví
+	
+	# Update health bars
 	update_hp_bars()
-
-	# Resetujte Global data
+	
+	# Reset Global data
 	Global.player_data = null
 	Global.enemy_data = null
-
-	# Zahajte souboj
+	
+	# Start the battle
 	start_combat()
 
 func update_hp_bars():
@@ -76,81 +76,58 @@ func update_hp_bars():
 
 func start_combat():
 	print("Starting combat...")
-	# Hráčův časovač
+	
+	# Player attack timer
 	var player_timer = Timer.new()
 	player_timer.wait_time = player_stats["attack_speed"]
-	player_timer.one_shot = false  # Časovač se bude opakovat
+	player_timer.one_shot = false
 	player_timer.connect("timeout", Callable(self, "_on_player_attack"))
 	add_child(player_timer)
 	player_timer.start()
-	player_timer.name = "PlayerTimer"
-	print("Player timer started with wait time:", player_stats["attack_speed"])
-
-	# Nepřítelův časovač
+	
+	# Enemy attack timer
 	var enemy_timer = Timer.new()
 	enemy_timer.wait_time = enemy_stats["attack_speed"]
 	enemy_timer.one_shot = false
 	enemy_timer.connect("timeout", Callable(self, "_on_enemy_attack"))
 	add_child(enemy_timer)
 	enemy_timer.start()
-	enemy_timer.name = "EnemyTimer"
-	print("Enemy timer started with wait time:", enemy_stats["attack_speed"])
 
 func _on_player_attack():
-	print("Entering _on_player_attack()")
-	if enemy_stats == null:
-		print("Error: enemy_stats is null")
-		return
-	if not enemy_stats.has("hp"):
-		print("Error: enemy_stats does not have 'hp'")
-		return
 	if enemy_stats["hp"] <= 0:
-		print("Enemy is already dead.")
-		return  # Nepřítel je již mrtvý
+		return
 	print("Player attacks!")
 	enemy_stats["hp"] -= player_stats["attack"]
 	update_hp_bars()
-	print("Enemy HP after attack:", enemy_stats["hp"])
 	if enemy_stats["hp"] <= 0:
 		await end_battle("player")
 
 func _on_enemy_attack():
-	print("Entering _on_enemy_attack()")
-	if player_stats == null:
-		print("Error: player_stats is null")
-		return
-	if not player_stats.has("hp"):
-		print("Error: player_stats does not have 'hp'")
-		return
 	if player_stats["hp"] <= 0:
-		print("Player is already dead.")
-		return  # Hráč je již mrtvý
+		return
 	print("Enemy attacks!")
 	player_stats["hp"] -= enemy_stats["attack"]
 	update_hp_bars()
-	print("Player HP after attack:", player_stats["hp"])
 	if player_stats["hp"] <= 0:
 		await end_battle("enemy")
 
 func end_battle(winner):
+	print("Battle ended. Winner:", winner)
+	
 	if winner == "player":
-		print("Hráč vyhrál souboj!")
 		enemy.queue_free()
 	else:
-		print("Nepřítel vyhrál souboj!")
 		player.queue_free()
 
-	# Zastavte časovače
-	if has_node("PlayerTimer"):
-		get_node("PlayerTimer").stop()
-		get_node("PlayerTimer").queue_free()
-	if has_node("EnemyTimer"):
-		get_node("EnemyTimer").stop()
-		get_node("EnemyTimer").queue_free()
+	# Uložíme pozici hráče zpět do Global
+	if player:
+		if Global.player_data == null:
+			Global.player_data = {}
+		Global.player_data["position"] = player.position
 
-	# Návrat do hlavní scény po krátké prodlevě, ale bez nové generace mapy
+	# Zpoždění před návratem na mapu
 	await get_tree().create_timer(2.0).timeout
-	print("Returning to main scene without regenerating map...")
+	print("Returning to the map...")
 
-	# Pouze změnit zpět na hlavní scénu bez regenerace
-	get_tree().change_scene_to_file("res://Scenes/main.tscn")
+	# Odstranění battle scény z hlavní scény
+	queue_free()
