@@ -45,3 +45,6 @@ func move_along_path(_delta):
 
 func change_direction():
 	direction *= -1
+
+func respawn():
+	position = Global.load_player_position()
